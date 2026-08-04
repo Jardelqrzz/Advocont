@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Formulário de contratação — Advocont</title>
+<meta name="description" content="Conte pra gente sobre o seu escritório e receba o plano Advocont recomendado para você." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html#topo">
+      <img class="brand-logo" src="assets/logo.png" alt="Advocont — Contabilidade digital para advogados" />
+    </a>
+    <nav class="nav-links" aria-label="Navegação principal">
+      <a href="index.html#servicos">Serviços</a>
+      <a href="index.html#como-funciona">Como funciona</a>
+      <a href="index.html#planos">Planos</a>
+      <a href="index.html#faq">Perguntas</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="login-link" href="index.html#login">Login</a>
+      <a class="btn btn-gold" href="index.html#planos">Falar com especialista</a>
+    </div>
+    <input type="checkbox" id="menu-toggle" class="menu-toggle-input" />
+    <label for="menu-toggle" class="burger" aria-label="Abrir menu">
+      <span></span><span></span><span></span>
+    </label>
+    <nav class="mobile-panel" aria-label="Navegação móvel">
+      <a href="index.html#servicos">Serviços</a>
+      <a href="index.html#como-funciona">Como funciona</a>
+      <a href="index.html#planos">Planos</a>
+      <a href="index.html#faq">Perguntas</a>
+      <a href="index.html#login">Login</a>
+      <a class="btn btn-gold" href="index.html#planos">Falar com especialista</a>
+    </nav>
+  </div>
+</header>
+
+<main id="topo">
+  <section>
+    <div class="wrap">
+      <div class="wizard-card">
+        <p class="wizard-progress" id="wizard-progress">Etapa 1 de 5</p>
+
+        <!-- STEP 1: contato -->
+        <div class="wizard-step active" data-step="contato">
+          <h2>Vamos começar com os seus dados</h2>
+          <p class="lead">Nome, telefone e e-mail para o especialista Advocont entrar em contato.</p>
+          <div class="field">
+            <label for="nome">Nome completo</label>
+            <input type="text" id="nome" required />
+            <span class="field-error">Informe seu nome completo.</span>
+          </div>
+          <div class="field">
+            <label for="telefone">Telefone (com DDD)</label>
+            <input type="tel" id="telefone" required />
+            <span class="field-error">Informe um telefone válido.</span>
+          </div>
+          <div class="field">
+            <label for="email">E-mail</label>
+            <input type="email" id="email" required />
+            <span class="field-error">Informe um e-mail válido.</span>
+          </div>
+          <div class="wizard-actions">
+            <span></span>
+            <button type="button" class="btn btn-gold" data-next="contato">Continuar</button>
+          </div>
+        </div>
+
+        <!-- STEP 2: cnpj -->
+        <div class="wizard-step" data-step="cnpj">
+          <h2>Seu escritório já tem CNPJ aberto?</h2>
+          <p class="lead">Isso define qual caminho seguimos daqui.</p>
+          <div class="choice-group">
+            <button type="button" class="choice-btn" id="choice-sim">
+              <strong>Sim, já tenho CNPJ</strong>
+              <span>Vou informar os dados da minha sociedade atual.</span>
+            </button>
+            <button type="button" class="choice-btn" id="choice-nao">
+              <strong>Não, ainda não tenho</strong>
+              <span>Quero abrir minha sociedade de advocacia.</span>
+            </button>
+          </div>
+          <div class="wizard-actions">
+            <button type="button" class="btn-back" data-back="contato">← Voltar</button>
+            <span></span>
+          </div>
+        </div>
+
+        <!-- STEP 3A: dados-a (tem CNPJ) -->
+        <div class="wizard-step" data-step="dados-a">
+          <h2>Dados da sua sociedade</h2>
+          <p class="lead">Para simular sua carga tributária e indicar o plano ideal.</p>
+          <div class="field">
+            <label for="a-cnpj">CNPJ</label>
+            <input type="text" id="a-cnpj" required />
+            <span class="field-error">Informe o CNPJ.</span>
+          </div>
+          <div class="field">
+            <label for="a-regime">Regime tributário atual</label>
+            <select id="a-regime" required>
+              <option value="" disabled selected>Selecione</option>
+              <option value="Simples Nacional">Simples Nacional</option>
+              <option value="Lucro Presumido">Lucro Presumido</option>
+              <option value="Ainda não sei / outro">Ainda não sei / outro</option>
+            </select>
+            <span class="field-error">Selecione o regime tributário.</span>
+          </div>
+          <div class="field">
+            <label for="a-faturamento">Faturamento do último mês (R$)</label>
+            <input type="number" id="a-faturamento" min="0" step="0.01" required />
+            <span class="field-error">Informe o faturamento do último mês.</span>
+          </div>
+          <div class="wizard-actions">
+            <button type="button" class="btn-back" data-back="cnpj">← Voltar</button>
+            <button type="button" class="btn btn-gold" data-calc="a">Calcular</button>
+          </div>
+        </div>
+
+        <!-- STEP 4A: resultado-a -->
+        <div class="wizard-step" data-step="resultado-a">
+          <h2>Simulação e plano recomendado</h2>
+          <p class="lead">Comparativo estimado entre os regimes, com base no que você informou.</p>
+          <div id="resultado-a-content"></div>
+          <label class="checkbox-field">
+            <input type="checkbox" id="concorda-a" />
+            Estou de acordo com a simulação e quero prosseguir com a Advocont.
+          </label>
+          <form id="form-a">
+            <div class="wizard-actions">
+              <button type="button" class="btn-back" data-back="dados-a">← Voltar</button>
+              <button type="submit" class="btn btn-gold" id="btn-enviar-a" disabled>Enviar</button>
+            </div>
+            <p class="form-status"></p>
+          </form>
+        </div>
+
+        <!-- STEP 3B: dados-b (não tem CNPJ) -->
+        <div class="wizard-step" data-step="dados-b">
+          <h2>Vamos planejar a abertura do seu escritório</h2>
+          <p class="lead">Conta pra gente onde e como você imagina o seu escritório.</p>
+          <div class="field-row">
+            <div class="field">
+              <label for="b-cidade">Cidade</label>
+              <input type="text" id="b-cidade" required />
+              <span class="field-error">Informe a cidade.</span>
+            </div>
+            <div class="field">
+              <label for="b-uf">Estado</label>
+              <select id="b-uf" required>
+                <option value="" disabled selected>UF</option>
+                <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+                <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+                <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+                <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+                <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+                <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+                <option>SP</option><option>SE</option><option>TO</option>
+              </select>
+              <span class="field-error">Selecione o estado.</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="b-faturamento">Faturamento mensal que você imagina (R$)</label>
+            <input type="number" id="b-faturamento" min="0" step="0.01" required />
+            <span class="field-error">Informe o faturamento estimado.</span>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="b-funcionarios">Quantos funcionários</label>
+              <input type="number" id="b-funcionarios" min="0" step="1" required />
+              <span class="field-error">Informe um número.</span>
+            </div>
+            <div class="field">
+              <label for="b-notas">Notas no 1º mês</label>
+              <input type="number" id="b-notas" min="0" step="1" required />
+              <span class="field-error">Informe um número.</span>
+            </div>
+          </div>
+          <div class="wizard-actions">
+            <button type="button" class="btn-back" data-back="cnpj">← Voltar</button>
+            <button type="button" class="btn btn-gold" data-calc="b">Ver planos recomendados</button>
+          </div>
+        </div>
+
+        <!-- STEP 4B: resultado-b -->
+        <div class="wizard-step" data-step="resultado-b">
+          <h2>Plano recomendado para o seu escritório</h2>
+          <p class="lead">Com base no que você planeja faturar.</p>
+          <div id="resultado-b-content"></div>
+          <label class="checkbox-field">
+            <input type="checkbox" id="concorda-b" />
+            Estou de acordo e quero prosseguir com a Advocont.
+          </label>
+          <form id="form-b">
+            <div class="wizard-actions">
+              <button type="button" class="btn-back" data-back="dados-b">← Voltar</button>
+              <button type="submit" class="btn btn-gold" id="btn-enviar-b" disabled>Submeter</button>
+            </div>
+            <p class="form-status"></p>
+          </form>
+        </div>
+
+        <!-- STEP 5: confirmação -->
+        <div class="wizard-step" data-step="confirmacao">
+          <div class="confirmation-screen">
+            <div class="icon">✓</div>
+            <h2>Recebemos suas informações</h2>
+            <p>Um especialista da Advocont entrará em contato em breve.</p>
+            <a class="btn btn-ghost" href="index.html#topo" style="margin-top:24px;">Voltar para o site</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <img class="brand-logo" src="assets/logo.png" alt="Advocont — Contabilidade digital para advogados" />
+        <p>Contabilidade digital para advogados e sociedades de advocacia, em todo o Brasil.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Atendimento</h4>
+        <ul>
+          <li>Segunda à sexta-feira, 8h–18h</li>
+          <li>WhatsApp: +55 81 7304-9598</li>
+          <li>advocont.2026@gmail.com</li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Advocont</h4>
+        <ul>
+          <li>Todos os direitos reservados à Advocont, escritório de contabilidade especializado em advocacia.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Advocont Contabilidade. Todos os direitos reservados.</span>
+      <span>Marca registrada.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+<script>
+  const planoInteresse = getQueryParam("plano");
+  const state = {};
+  const STEP_ORDER = { contato: 1, cnpj: 2, "dados-a": 3, "resultado-a": 4, "dados-b": 3, "resultado-b": 4, confirmacao: 5 };
+  const TOTAL_STEPS = 5;
+
+  function goTo(stepName) {
+    document.querySelectorAll(".wizard-step").forEach((el) => el.classList.remove("active"));
+    document.querySelector('.wizard-step[data-step="' + stepName + '"]').classList.add("active");
+    document.getElementById("wizard-progress").textContent = "Etapa " + STEP_ORDER[stepName] + " de " + TOTAL_STEPS;
+  }
+
+  function validateStep(stepEl) {
+    let valid = true;
+    stepEl.querySelectorAll("input[required], select[required]").forEach((input) => {
+      const field = input.closest(".field");
+      if (!input.checkValidity() || !String(input.value).trim()) {
+        field?.classList.add("invalid");
+        valid = false;
+      } else {
+        field?.classList.remove("invalid");
+      }
+    });
+    return valid;
+  }
+
+  document.querySelectorAll("[data-next]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const step = btn.closest(".wizard-step");
+      if (!validateStep(step)) return;
+      goTo("cnpj");
+    });
+  });
+
+  document.querySelectorAll("[data-back]").forEach((btn) => {
+    btn.addEventListener("click", () => goTo(btn.dataset.back));
+  });
+
+  document.getElementById("choice-sim").addEventListener("click", () => goTo("dados-a"));
+  document.getElementById("choice-nao").addEventListener("click", () => goTo("dados-b"));
+
+  document.querySelector('[data-calc="a"]').addEventListener("click", () => {
+    const step = document.querySelector('.wizard-step[data-step="dados-a"]');
+    if (!validateStep(step)) return;
+    renderResultadoA();
+    goTo("resultado-a");
+  });
+
+  document.querySelector('[data-calc="b"]').addEventListener("click", () => {
+    const step = document.querySelector('.wizard-step[data-step="dados-b"]');
+    if (!validateStep(step)) return;
+    renderResultadoB();
+    goTo("resultado-b");
+  });
+
+  function renderResultadoA() {
+    const faturamento = parseFloat(document.getElementById("a-faturamento").value) || 0;
+    const simples = calcSimplesAnexoIV(faturamento);
+    const presumido = calcLucroPresumido(faturamento);
+    const planoKey = recommendPlan(faturamento);
+    const plano = PLANS[planoKey];
+    const melhor = simples.anual <= presumido.anual ? "simples" : "presumido";
+
+    document.getElementById("resultado-a-content").innerHTML =
+      '<div class="compare-result">' +
+        '<div class="regime-card ' + (melhor === "simples" ? "better" : "") + '">' +
+          '<p class="regime-name">Simples Nacional (Anexo IV)</p>' +
+          '<p class="regime-value">' + formatBRL(simples.anual) + '</p>' +
+          '<p class="regime-sub">estimativa anual de DAS</p>' +
+        '</div>' +
+        '<div class="regime-card ' + (melhor === "presumido" ? "better" : "") + '">' +
+          '<p class="regime-name">Lucro Presumido</p>' +
+          '<p class="regime-value">' + formatBRL(presumido.anual) + '</p>' +
+          '<p class="regime-sub">estimativa anual (IRPJ+CSLL+PIS+COFINS+ISS)</p>' +
+        '</div>' +
+      '</div>' +
+      '<p class="pricing-note">Valores estimados com base em tabelas padrão — a Advocont confirma o enquadramento exato na consultoria. No Simples Nacional, o INSS patronal (CPP) é recolhido à parte.</p>' +
+      '<div class="recommend-card">' +
+        '<p class="eyebrow">Plano recomendado</p>' +
+        '<p class="plan-name">' + plano.name + " — " + plano.preco + '</p>' +
+        '<ul>' + plano.deliverables.map((d) => '<li><span class="tick">✓</span> ' + d + '</li>').join("") + '</ul>' +
+      '</div>';
+
+    state.simplesAnual = simples.anual;
+    state.presumidoAnual = presumido.anual;
+    state.planoRecomendado = plano.name;
+  }
+
+  function renderResultadoB() {
+    const faturamento = parseFloat(document.getElementById("b-faturamento").value) || 0;
+    const planoKey = recommendPlan(faturamento);
+    const plano = PLANS[planoKey];
+
+    document.getElementById("resultado-b-content").innerHTML =
+      '<div class="recommend-card">' +
+        '<p class="eyebrow">Plano recomendado para o seu escritório</p>' +
+        '<p class="plan-name">' + plano.name + " — " + plano.preco + '</p>' +
+        '<ul>' + plano.deliverables.map((d) => '<li><span class="tick">✓</span> ' + d + '</li>').join("") + '</ul>' +
+      '</div>' +
+      '<p class="pricing-note">Estimativa com base no faturamento informado — o especialista confirma a melhor opção na consultoria.</p>';
+
+    state.planoRecomendado = plano.name;
+  }
+
+  document.getElementById("concorda-a").addEventListener("change", (e) => {
+    document.getElementById("btn-enviar-a").disabled = !e.target.checked;
+  });
+  document.getElementById("concorda-b").addEventListener("change", (e) => {
+    document.getElementById("btn-enviar-b").disabled = !e.target.checked;
+  });
+
+  document.getElementById("form-a").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("btn-enviar-a");
+    const status = e.target.querySelector(".form-status");
+    const nome = document.getElementById("nome").value;
+    const payload = {
+      nome,
+      telefone: document.getElementById("telefone").value,
+      email: document.getElementById("email").value,
+      plano_de_interesse: (planoInteresse && PLANS[planoInteresse]) ? PLANS[planoInteresse].name : "(não informado)",
+      caminho: "Já possui CNPJ — transferência de contabilidade",
+      cnpj: document.getElementById("a-cnpj").value,
+      regime_atual: document.getElementById("a-regime").value,
+      faturamento_ultimo_mes: document.getElementById("a-faturamento").value,
+      simulacao_simples_nacional_anual: formatBRL(state.simplesAnual || 0),
+      simulacao_lucro_presumido_anual: formatBRL(state.presumidoAnual || 0),
+      plano_recomendado: state.planoRecomendado || "",
+    };
+    btn.disabled = true;
+    status.textContent = "Enviando...";
+    status.className = "form-status visible is-sending";
+    try {
+      await submitLead(payload, "Transferência de contabilidade - " + nome);
+      goTo("confirmacao");
+    } catch (err) {
+      status.textContent = "Não foi possível enviar agora. Tente novamente ou chame no WhatsApp.";
+      status.className = "form-status visible is-error";
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("form-b").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("btn-enviar-b");
+    const status = e.target.querySelector(".form-status");
+    const nome = document.getElementById("nome").value;
+    const payload = {
+      nome,
+      telefone: document.getElementById("telefone").value,
+      email: document.getElementById("email").value,
+      plano_de_interesse: (planoInteresse && PLANS[planoInteresse]) ? PLANS[planoInteresse].name : "(não informado)",
+      caminho: "Ainda não possui CNPJ — abertura de novo CNPJ",
+      cidade: document.getElementById("b-cidade").value,
+      uf: document.getElementById("b-uf").value,
+      faturamento_estimado: document.getElementById("b-faturamento").value,
+      numero_de_funcionarios: document.getElementById("b-funcionarios").value,
+      notas_no_primeiro_mes: document.getElementById("b-notas").value,
+      plano_recomendado: state.planoRecomendado || "",
+    };
+    btn.disabled = true;
+    status.textContent = "Enviando...";
+    status.className = "form-status visible is-sending";
+    try {
+      await submitLead(payload, "Abertura de um novo CNPJ - " + nome);
+      goTo("confirmacao");
+    } catch (err) {
+      status.textContent = "Não foi possível enviar agora. Tente novamente ou chame no WhatsApp.";
+      status.className = "form-status visible is-error";
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
