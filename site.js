@@ -18,6 +18,7 @@ async function submitLead(fields, subject) {
   });
   const data = await res.json();
   if (!data.success) throw new Error(data.message || "Falha ao enviar formulário");
+  track("generate_lead", { origem: subject.split(" - ")[0] });
   return data;
 }
 
@@ -312,3 +313,74 @@ function initExitIntent() {
 }
 
 document.addEventListener("DOMContentLoaded", initExitIntent);
+
+/* ---------- Medição de conversão ----------
+   Pronto para quando Google Analytics 4 (gtag) e/ou Meta Pixel (fbq) forem instalados:
+   enquanto não existirem, as chamadas não fazem nada. */
+function track(evento, dados) {
+  try {
+    if (typeof window.gtag === "function") window.gtag("event", evento, dados || {});
+    if (typeof window.fbq === "function") {
+      if (evento === "generate_lead") window.fbq("track", "Lead", dados || {});
+      else if (evento === "whatsapp_click") window.fbq("track", "Contact", dados || {});
+    }
+    (window.dataLayer = window.dataLayer || []).push(Object.assign({ event: evento }, dados || {}));
+  } catch (e) {}
+}
+
+/* ---------- WhatsApp com dois caminhos ----------
+   A mensagem é escrita na voz do advogado, pronta para ele só apertar "enviar". */
+const WHATSAPP_MENSAGENS = {
+  cnpj:
+    "Olá, equipe Advocont! Já tenho CNPJ e quero descobrir quanto meu escritório pode economizar em impostos, dentro da lei. Podem fazer uma análise do meu caso?",
+  abertura:
+    "Olá, equipe Advocont! Vou abrir minha sociedade de advocacia e quero começar do jeito certo: regularizado e no enquadramento tributário ideal desde o primeiro honorário. Podem me orientar nos próximos passos?",
+};
+
+function linkWhatsApp(texto) {
+  return "https://wa.me/" + WHATSAPP_NUMERO + "?text=" + encodeURIComponent(texto);
+}
+
+function abrirWhatsApp(caminho, texto, origem) {
+  track("whatsapp_click", { caminho: caminho, origem: origem || "site" });
+  window.open(linkWhatsApp(texto || WHATSAPP_MENSAGENS[caminho]), "_blank", "noopener");
+}
+
+/* Seletor "Já tem CNPJ?" aberto por qualquer elemento com data-whatsapp. */
+function initWhatsAppChooser() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.id = "wa-chooser";
+  overlay.hidden = true;
+  overlay.innerHTML =
+    '<div class="modal wa-chooser" role="dialog" aria-modal="true" aria-labelledby="wa-chooser-title">' +
+      '<button type="button" class="modal-close" aria-label="Fechar">×</button>' +
+      '<p class="eyebrow">Falar com especialista</p>' +
+      '<h3 id="wa-chooser-title">Seu escritório já tem CNPJ?</h3>' +
+      '<p class="lead">Assim o especialista já começa a conversa pelo que importa para você.</p>' +
+      '<div class="choice-group">' +
+        '<button type="button" class="choice-btn" data-wa-caminho="cnpj"><strong>Sim, já tenho CNPJ</strong><span>Quero saber quanto posso economizar em impostos.</span></button>' +
+        '<button type="button" class="choice-btn" data-wa-caminho="abertura"><strong>Ainda não, vou abrir</strong><span>Quero abrir minha sociedade de advocacia regularizada.</span></button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  let origem = "site";
+  const fechar = () => { overlay.hidden = true; };
+  overlay.querySelector(".modal-close").addEventListener("click", fechar);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) fechar(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") fechar(); });
+  overlay.querySelectorAll("[data-wa-caminho]").forEach((btn) =>
+    btn.addEventListener("click", () => { fechar(); abrirWhatsApp(btn.dataset.waCaminho, null, origem); })
+  );
+  document.querySelectorAll("[data-whatsapp]").forEach((el) =>
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      origem = el.dataset.whatsapp || "site";
+      const menu = document.getElementById("menu-toggle");
+      if (menu) menu.checked = false;
+      overlay.hidden = false;
+      overlay.querySelector("[data-wa-caminho]").focus();
+    })
+  );
+}
+document.addEventListener("DOMContentLoaded", initWhatsAppChooser);
