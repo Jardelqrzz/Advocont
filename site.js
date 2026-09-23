@@ -1,4 +1,7 @@
 /* ---------- Web3Forms ---------- */
+/* WhatsApp comercial (só dígitos, com 55 + DDD) */
+const WHATSAPP_NUMERO = "558195553023";
+
 const WEB3FORMS_KEY = "727f2ca2-c42b-49a3-be7b-96566f0f1071";
 
 async function submitLead(fields, subject) {
@@ -23,73 +26,88 @@ function getQueryParam(name) {
 }
 
 /* ---------- Dados dos planos (espelha a tabela comparativa do index.html) ----------
-   notasInclusas e funcionariosConfortaveis alimentam a recomendação do caminho "ainda não
-   tenho CNPJ" (ver recommendPlanCompleto) — refletem a capacidade de cada plano (notas
-   inclusas/mês da tabela comparativa) e o perfil descrito em cada plan-desc do index.html
-   (autônomo/começando -> equipe própria -> escritório consolidado). Ajustável se o Jardel
-   quiser outro corte de funcionários por plano. */
+   ATENÇÃO: qualquer mudança de preço, limite ou benefício precisa ser feita aqui E no
+   index.html (cards + tabela comparativa), senão a recomendação do formulário diverge da vitrine.
+   folhasInclusas / notasInclusas = franquia do plano; o excedente custa EXCEDENTE_UNITARIO
+   por folha ou nota (nota ³ da tabela). */
+const EXCEDENTE_UNITARIO = 25;
+const LIMITE_PLANOS = 100000; // acima disso: proposta personalizada
+
 const PLANS = {
   essencial: {
     name: "Advocont Essencial",
     limite: 30000,
     notasInclusas: 10,
-    funcionariosConfortaveis: 1,
+    folhasInclusas: 1,
+    valor: 250,
     preco: "R$250/mês",
     deliverables: [
       "Contabilidade completa do escritório",
       "10 notas de honorários inclusas/mês",
+      "1 folha de pagamento inclusa",
       "Atendimento por e-mail, WhatsApp e aplicativo web e mobile",
       "Abertura de sociedade sem custo",
     ],
   },
   estrategico: {
     name: "Advocont Estratégico",
-    limite: 40000,
-    notasInclusas: 40,
-    funcionariosConfortaveis: 4,
+    limite: 60000,
+    notasInclusas: 60,
+    folhasInclusas: 2,
+    valor: 350,
     preco: "R$350/mês",
     deliverables: [
       "Tudo do plano Essencial",
-      "40 notas de honorários inclusas/mês",
-      "Certificado digital gratuito (1x/ano)",
-      "Atendimento por e-mail, WhatsApp e aplicativo web e mobile",
+      "60 notas de honorários inclusas/mês",
+      "Até 2 folhas de pagamento inclusas",
+      "Certificado digital com 50% de desconto (1x/ano)",
+      "Consultoria tributária 1x por trimestre",
+      "Abertura de sociedade sem custo",
     ],
   },
   prime: {
     name: "Advocont Prime",
     limite: 100000,
     notasInclusas: Infinity,
-    funcionariosConfortaveis: Infinity,
+    folhasInclusas: 5,
+    valor: 550,
     preco: "R$550/mês",
     deliverables: [
       "Tudo do plano Estratégico",
       "Notas de honorários ilimitadas",
+      "Certificado digital incluso (1x/ano)",
       "Gerente de conta dedicado",
       "Reunião de consultoria tributária mensal",
-      "Folha de pagamento — 2 colaboradores inclusos",
+      "Até 5 folhas de pagamento inclusas",
     ],
   },
 };
 
 const PLAN_ORDER = ["essencial", "estrategico", "prime"];
 
-function recommendPlan(faturamentoMensal) {
-  if (faturamentoMensal <= PLANS.essencial.limite) return "essencial";
-  if (faturamentoMensal <= PLANS.estrategico.limite) return "estrategico";
-  return "prime";
+/* Custo mensal estimado de um plano para o perfil informado (mensalidade + excedentes). */
+function custoPlano(key, funcionarios, notas) {
+  const p = PLANS[key];
+  const folhasExtras = Math.max(0, (funcionarios || 0) - p.folhasInclusas);
+  const notasExtras = Math.max(0, (notas || 0) - p.notasInclusas);
+  return p.valor + (folhasExtras + notasExtras) * EXCEDENTE_UNITARIO;
 }
 
-/* Caminho "ainda não tenho CNPJ": considera faturamento, funcionários e notas —
-   o plano recomendado é o mais exigente entre os três critérios (nunca "arredonda pra baixo"). */
-function menorIndicePlanoQueAtende(getLimite, valor) {
-  const idx = PLAN_ORDER.findIndex((key) => valor <= getLimite(PLANS[key]));
-  return idx === -1 ? PLAN_ORDER.length - 1 : idx;
+/* Caminho "já tenho CNPJ": só o faturamento define a faixa. */
+function recommendPlan(faturamentoMensal) {
+  return PLAN_ORDER.find((key) => faturamentoMensal <= PLANS[key].limite) || "prime";
 }
+
+/* Caminho "ainda não tenho CNPJ": entre os planos cuja faixa comporta o faturamento,
+   recomenda o de MENOR custo mensal total (mensalidade + folhas e notas excedentes).
+   Em caso de empate, fica o plano superior (mais benefícios pelo mesmo valor).
+   Assim o cliente nunca é empurrado para um plano mais caro do que precisa. */
 function recommendPlanCompleto(faturamentoMensal, funcionarios, notas) {
-  const idxFaturamento = menorIndicePlanoQueAtende((p) => p.limite, faturamentoMensal);
-  const idxNotas = menorIndicePlanoQueAtende((p) => p.notasInclusas, notas);
-  const idxFuncionarios = menorIndicePlanoQueAtende((p) => p.funcionariosConfortaveis, funcionarios);
-  return PLAN_ORDER[Math.max(idxFaturamento, idxNotas, idxFuncionarios)];
+  const elegiveis = PLAN_ORDER.filter((key) => faturamentoMensal <= PLANS[key].limite);
+  if (!elegiveis.length) return "prime";
+  return elegiveis.reduce((melhor, key) =>
+    custoPlano(key, funcionarios, notas) <= custoPlano(melhor, funcionarios, notas) ? key : melhor
+  );
 }
 
 /* ---------- Simulação tributária (estimativa — ver aviso na tela) ----------
@@ -126,6 +144,49 @@ function calcLucroPresumido(faturamentoMensal) {
 
 function formatBRL(value) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
+
+/* ---------- Validações ----------
+   Usadas pelo formulário (atributo data-validate) e pelo popup de saída. */
+const VALIDATORS = {
+  nome(v) {
+    // Nome e sobrenome, cada parte com 2+ letras
+    return v.trim().split(/\s+/).filter((p) => p.replace(/[^A-Za-zÀ-ÿ]/g, "").length >= 2).length >= 2;
+  },
+  telefone(v) {
+    const d = v.replace(/\D/g, "");
+    if (d.length !== 10 && d.length !== 11) return false;
+    const ddd = parseInt(d.slice(0, 2), 10);
+    if (ddd < 11 || ddd > 99 || d[1] === "0") return false;
+    if (d.length === 11 && d[2] !== "9") return false; // celular com 9 dígitos começa com 9
+    return !/^(\d)\1+$/.test(d.slice(2));
+  },
+  email(v) {
+    return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v.trim());
+  },
+  cnpj(v) {
+    const d = v.replace(/\D/g, "");
+    if (d.length !== 14 || /^(\d)\1+$/.test(d)) return false;
+    const calc = (len) => {
+      const pesos = len === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2];
+      const soma = pesos.reduce((acc, p, i) => acc + parseInt(d[i], 10) * p, 0);
+      const r = soma % 11;
+      return r < 2 ? 0 : 11 - r;
+    };
+    return calc(12) === parseInt(d[12], 10) && calc(13) === parseInt(d[13], 10);
+  },
+  moeda(v, input) {
+    return parseFloat(input.dataset.rawValue || "0") > 0;
+  },
+};
+
+function isFieldValid(input) {
+  const value = String(input.value || "");
+  if (input.required && !value.trim()) return false;
+  if (!input.checkValidity()) return false;
+  const rule = input.dataset.validate;
+  if (rule && VALIDATORS[rule] && !VALIDATORS[rule](value, input)) return false;
+  return true;
 }
 
 /* ---------- Máscaras de campo ---------- */
@@ -223,6 +284,13 @@ function initExitIntent() {
     e.preventDefault();
     const status = form.querySelector(".form-status");
     const btn = form.querySelector('button[type="submit"]');
+    let ok = true;
+    form.querySelectorAll("input[required]").forEach((input) => {
+      const valid = isFieldValid(input);
+      input.closest(".field")?.classList.toggle("invalid", !valid);
+      if (!valid) ok = false;
+    });
+    if (!ok) return;
     const fd = new FormData(form);
     const nome = fd.get("nome");
     btn.disabled = true;
