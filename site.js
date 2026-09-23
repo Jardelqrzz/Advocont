@@ -4,8 +4,18 @@ const WHATSAPP_NUMERO = "558195553023";
 
 const WEB3FORMS_KEY = "727f2ca2-c42b-49a3-be7b-96566f0f1071";
 
+/* Anti-spam: campo invisível (honeypot) e tempo mínimo na página.
+   Robôs costumam preencher todos os campos e enviar em menos de 3 segundos. */
+const PAGE_LOADED_AT = Date.now();
+function pareceRobo() {
+  const honeypot = [...document.querySelectorAll(".hp-field")].some((el) => el.checked);
+  return honeypot || Date.now() - PAGE_LOADED_AT < 3000;
+}
+
 async function submitLead(fields, subject) {
+  if (pareceRobo()) return { success: true, ignored: true }; // finge sucesso, não envia
   const payload = {
+    botcheck: false,
     access_key: WEB3FORMS_KEY,
     subject: subject,
     from_name: "Site Advocont",

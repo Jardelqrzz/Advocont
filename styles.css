@@ -533,3 +533,6 @@ footer{background:var(--brand-navy);color:var(--brand-soft);padding-block:52px 3
 .wa-chooser .choice-group{margin-top:20px;}
 .wa-chooser .choice-btn{text-align:left;cursor:pointer;}
 .wa-chooser .choice-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+
+/* ---------- Anti-spam: campo invisível para humanos ---------- */
+.hp-field{position:absolute !important;left:-9999px !important;width:1px;height:1px;opacity:0;pointer-events:none;}

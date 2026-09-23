@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /contratacao.html
+
+Sitemap: https://advocont.com/sitemap.xml
