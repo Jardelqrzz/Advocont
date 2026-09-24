@@ -533,6 +533,14 @@ footer{background:var(--brand-navy);color:var(--brand-soft);padding-block:52px 3
 .wa-chooser .choice-group{margin-top:20px;}
 .wa-chooser .choice-btn{text-align:left;cursor:pointer;}
 .wa-chooser .choice-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+.wa-chooser .field select{font:inherit;}
+.wa-chooser .opcional{font-weight:400;color:var(--ink-faint);}
+.wa-plano-indicado{font-size:.82rem;color:var(--gold-strong);margin-top:4px;}
+.wa-plano-indicado:empty{display:none;}
+.wa-form-links{display:flex;justify-content:space-between;gap:12px;margin-top:14px;}
+.wa-link{background:none;border:none;padding:6px 0;font:inherit;font-size:.86rem;color:var(--ink-soft);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.wa-link:hover{color:var(--ink);}
+.wa-step[hidden],.wa-chooser .field[hidden]{display:none;}
 
 /* ---------- Anti-spam: campo invisível para humanos ---------- */
 .hp-field{position:absolute !important;left:-9999px !important;width:1px;height:1px;opacity:0;pointer-events:none;}
