@@ -125,13 +125,15 @@ function recommendPlanCompleto(faturamentoMensal, funcionarios, notas) {
 /* ---------- Simulação tributária (estimativa — ver aviso na tela) ----------
    RBT12 aproximado como faturamento do último mês x 12.
    ISS assumido em 5% (teto mais comum) na falta da cidade do escritório. */
+/* iss = fatia do ISS dentro do DAS no Anexo IV (repartição da LC 123). Na 6ª faixa,
+   acima do sublimite de R$ 3,6 milhões, o ISS sai do DAS e é pago à parte. */
 const SIMPLES_ANEXO_IV = [
-  { limite: 180000, aliquota: 0.045, deduzir: 0 },
-  { limite: 360000, aliquota: 0.09, deduzir: 8100 },
-  { limite: 720000, aliquota: 0.102, deduzir: 12420 },
-  { limite: 1800000, aliquota: 0.14, deduzir: 39780 },
-  { limite: 3600000, aliquota: 0.22, deduzir: 183780 },
-  { limite: 4800000, aliquota: 0.33, deduzir: 828000 },
+  { limite: 180000, aliquota: 0.045, deduzir: 0, iss: 0.445 },
+  { limite: 360000, aliquota: 0.09, deduzir: 8100, iss: 0.40 },
+  { limite: 720000, aliquota: 0.102, deduzir: 12420, iss: 0.40 },
+  { limite: 1800000, aliquota: 0.14, deduzir: 39780, iss: 0.40 },
+  { limite: 3600000, aliquota: 0.22, deduzir: 183780, iss: 0.40 },
+  { limite: 4800000, aliquota: 0.33, deduzir: 828000, iss: 0 },
 ];
 
 function calcSimplesAnexoIV(faturamentoMensal) {
@@ -152,6 +154,49 @@ function calcLucroPresumido(faturamentoMensal) {
   const iss = faturamentoMensal * ISS_ASSUMIDO;
   const mensal = irpj + csll + pis + cofins + iss;
   return { anual: mensal * 12, mensal };
+}
+
+/* ---------- Estimativa de economia com ISS (caminho "já tenho CNPJ") ----------
+   Com o faturamento e o imposto que o escritório informa, estima quanto desse imposto
+   é ISS. Essa parcela é a economia potencial com o ISS em valor fixo, que a equipe
+   confirma na reunião (depende do município). O lead vê só o resultado. */
+const ISS_TETO = 0.05;
+
+/* Imposto mensal esperado pela tabela e quanto dele é ISS. */
+function impostoEsperado(faturamentoMensal, regime) {
+  if (regime === "Lucro Presumido") {
+    const p = calcLucroPresumido(faturamentoMensal); // já inclui ISS de 5%
+    return { total: p.mensal, iss: faturamentoMensal * ISS_TETO };
+  }
+  const rbt12 = faturamentoMensal * 12;
+  const faixa = SIMPLES_ANEXO_IV.find((f) => rbt12 <= f.limite) || SIMPLES_ANEXO_IV[SIMPLES_ANEXO_IV.length - 1];
+  const das = calcSimplesAnexoIV(faturamentoMensal).mensal;
+  if (!faixa.iss) {
+    // Acima do sublimite: ISS pago fora do DAS
+    const issFora = faturamentoMensal * ISS_TETO;
+    return { total: das + issFora, iss: issFora };
+  }
+  return { total: das, iss: Math.min(das * faixa.iss, faturamentoMensal * ISS_TETO) };
+}
+
+/* impostoInformado: número ou null ("não sei"). Valor fora da curva (menos da metade ou
+   mais do dobro do esperado) é trocado pelo da tabela, para um erro de digitação não
+   gerar economia absurda. A origem do número vai no e-mail do lead. */
+function estimarEconomiaISS(faturamentoMensal, regime, impostoInformado) {
+  const esperado = impostoEsperado(faturamentoMensal, regime);
+  const fatia = esperado.total > 0 ? esperado.iss / esperado.total : 0;
+  let base = esperado.total;
+  let origem = "calculado pela tabela (imposto não informado)";
+  if (impostoInformado != null) {
+    if (impostoInformado >= esperado.total * 0.5 && impostoInformado <= esperado.total * 2) {
+      base = impostoInformado;
+      origem = "informado pelo escritório";
+    } else {
+      origem = "informado fora da curva (" + formatBRL(impostoInformado) + "), usado o valor da tabela";
+    }
+  }
+  const issMensal = Math.min(base * fatia, faturamentoMensal * ISS_TETO);
+  return { impostoBase: base, impostoEsperado: esperado.total, fatiaIss: fatia, issMensal, issAnual: issMensal * 12, origem };
 }
 
 function formatBRL(value) {
