@@ -1,5 +1,7 @@
 /* Lógica do formulário de contratação (antes inline em formulario.html). */
   const planoInteresse = getQueryParam("plano");
+  // Botão do site que trouxe o lead (vem da janela "Falar com especialista")
+  const origemLead = "Formulário" + (getQueryParam("origem") ? " (botão " + getQueryParam("origem") + ")" : "") + " — advocont.com";
   const state = {};
   const STEP_ORDER = { contato: 1, cnpj: 2, "dados-a": 3, "resultado-a": 4, "dados-b": 3, "resultado-b": 4, confirmacao: 5 };
   const TOTAL_STEPS = 5;
@@ -157,6 +159,7 @@
       telefone: document.getElementById("telefone").value,
       email: document.getElementById("email").value,
       plano_de_interesse: (planoInteresse && PLANS[planoInteresse]) ? PLANS[planoInteresse].name : "(não informado)",
+      origem: origemLead,
       caminho: "Já possui CNPJ — estimativa de economia",
       cnpj: document.getElementById("a-cnpj").value,
       regime_atual: regime,
@@ -224,6 +227,7 @@
       telefone: document.getElementById("telefone").value,
       email: document.getElementById("email").value,
       plano_de_interesse: (planoInteresse && PLANS[planoInteresse]) ? PLANS[planoInteresse].name : "(não informado)",
+      origem: origemLead,
       caminho: "Ainda não possui CNPJ — abertura de novo CNPJ",
       cidade: document.getElementById("b-cidade").value,
       uf: document.getElementById("b-uf").value,
