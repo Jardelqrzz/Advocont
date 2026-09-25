@@ -95,7 +95,7 @@
         <!-- STEP 3A: dados-a (tem CNPJ) -->
         <div class="wizard-step" data-step="dados-a">
           <h2>Dados da sua sociedade</h2>
-          <p class="lead">Para simular sua carga tributária e indicar o plano ideal.</p>
+          <p class="lead">Com esses números estimamos quanto o seu escritório pode economizar em impostos.</p>
           <div class="field">
             <label for="a-cnpj">CNPJ</label>
             <input type="text" id="a-cnpj" required data-validate="cnpj" />
@@ -112,33 +112,39 @@
             <span class="field-error">Selecione o regime tributário.</span>
           </div>
           <div class="field">
-            <label for="a-faturamento">Faturamento do último mês (R$)</label>
+            <label for="a-faturamento">Faturamento médio por mês (R$)</label>
             <input type="text" id="a-faturamento" required data-validate="moeda" />
-            <span class="field-error">Informe o faturamento do último mês.</span>
+            <span class="field-hint">Se souber, a média dos últimos 12 meses.</span>
+            <span class="field-error">Informe o faturamento médio por mês.</span>
           </div>
+          <div class="field">
+            <label for="a-imposto">Imposto pago no último mês (R$)</label>
+            <input type="text" id="a-imposto" required data-validate="moeda" />
+            <span class="field-hint">Valor do DAS ou a soma das guias de impostos do mês.</span>
+            <span class="field-error">Informe o imposto pago ou marque "não sei".</span>
+          </div>
+          <label class="checkbox-field" style="margin-top:10px;">
+            <input type="checkbox" id="a-imposto-nao-sei" />
+            Não sei quanto pago de imposto
+          </label>
           <div class="wizard-actions">
             <button type="button" class="btn-back" data-back="cnpj">← Voltar</button>
-            <button type="button" class="btn btn-gold" data-calc="a">Calcular</button>
+            <button type="button" class="btn btn-gold" data-calc="a">Ver minha economia</button>
           </div>
         </div>
 
         <!-- STEP 4A: resultado-a -->
         <div class="wizard-step" data-step="resultado-a">
-          <h2>Simulação e plano recomendado</h2>
-          <p class="lead">Comparativo estimado entre os regimes, com base no que você informou.</p>
           <div id="resultado-a-content"></div>
-          <label class="checkbox-field">
-            <input type="checkbox" id="concorda-a" />
-            Estou de acordo com a simulação e quero prosseguir com a Advocont.
-          </label>
-          <form id="form-a">
-            <input type="checkbox" name="botcheck" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true" />
-            <div class="wizard-actions">
-              <button type="button" class="btn-back" data-back="dados-a">← Voltar</button>
-              <button type="submit" class="btn btn-gold" id="btn-enviar-a" disabled>Enviar</button>
-            </div>
-            <p class="form-status"></p>
-          </form>
+          <input type="checkbox" name="botcheck" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <div class="resultado-acoes">
+            <a class="btn btn-gold" id="a-agendar" href="#" target="_blank" rel="noopener">Agendar minha análise</a>
+            <a class="btn btn-ghost" id="a-whatsapp" href="#" target="_blank" rel="noopener">Falar no WhatsApp</a>
+          </div>
+          <div class="wizard-actions">
+            <button type="button" class="btn-back" data-back="dados-a">← Refazer a estimativa</button>
+            <span></span>
+          </div>
         </div>
 
         <!-- STEP 3B: dados-b (não tem CNPJ) -->

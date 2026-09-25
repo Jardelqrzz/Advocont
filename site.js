@@ -125,13 +125,15 @@ function recommendPlanCompleto(faturamentoMensal, funcionarios, notas) {
 /* ---------- Simulação tributária (estimativa — ver aviso na tela) ----------
    RBT12 aproximado como faturamento do último mês x 12.
    ISS assumido em 5% (teto mais comum) na falta da cidade do escritório. */
+/* iss = fatia do ISS dentro do DAS no Anexo IV (repartição da LC 123). Na 6ª faixa,
+   acima do sublimite de R$ 3,6 milhões, o ISS sai do DAS e é pago à parte. */
 const SIMPLES_ANEXO_IV = [
-  { limite: 180000, aliquota: 0.045, deduzir: 0 },
-  { limite: 360000, aliquota: 0.09, deduzir: 8100 },
-  { limite: 720000, aliquota: 0.102, deduzir: 12420 },
-  { limite: 1800000, aliquota: 0.14, deduzir: 39780 },
-  { limite: 3600000, aliquota: 0.22, deduzir: 183780 },
-  { limite: 4800000, aliquota: 0.33, deduzir: 828000 },
+  { limite: 180000, aliquota: 0.045, deduzir: 0, iss: 0.445 },
+  { limite: 360000, aliquota: 0.09, deduzir: 8100, iss: 0.40 },
+  { limite: 720000, aliquota: 0.102, deduzir: 12420, iss: 0.40 },
+  { limite: 1800000, aliquota: 0.14, deduzir: 39780, iss: 0.40 },
+  { limite: 3600000, aliquota: 0.22, deduzir: 183780, iss: 0.40 },
+  { limite: 4800000, aliquota: 0.33, deduzir: 828000, iss: 0 },
 ];
 
 function calcSimplesAnexoIV(faturamentoMensal) {
@@ -152,6 +154,49 @@ function calcLucroPresumido(faturamentoMensal) {
   const iss = faturamentoMensal * ISS_ASSUMIDO;
   const mensal = irpj + csll + pis + cofins + iss;
   return { anual: mensal * 12, mensal };
+}
+
+/* ---------- Estimativa de economia com ISS (caminho "já tenho CNPJ") ----------
+   Com o faturamento e o imposto que o escritório informa, estima quanto desse imposto
+   é ISS. Essa parcela é a economia potencial com o ISS em valor fixo, que a equipe
+   confirma na reunião (depende do município). O lead vê só o resultado. */
+const ISS_TETO = 0.05;
+
+/* Imposto mensal esperado pela tabela e quanto dele é ISS. */
+function impostoEsperado(faturamentoMensal, regime) {
+  if (regime === "Lucro Presumido") {
+    const p = calcLucroPresumido(faturamentoMensal); // já inclui ISS de 5%
+    return { total: p.mensal, iss: faturamentoMensal * ISS_TETO };
+  }
+  const rbt12 = faturamentoMensal * 12;
+  const faixa = SIMPLES_ANEXO_IV.find((f) => rbt12 <= f.limite) || SIMPLES_ANEXO_IV[SIMPLES_ANEXO_IV.length - 1];
+  const das = calcSimplesAnexoIV(faturamentoMensal).mensal;
+  if (!faixa.iss) {
+    // Acima do sublimite: ISS pago fora do DAS
+    const issFora = faturamentoMensal * ISS_TETO;
+    return { total: das + issFora, iss: issFora };
+  }
+  return { total: das, iss: Math.min(das * faixa.iss, faturamentoMensal * ISS_TETO) };
+}
+
+/* impostoInformado: número ou null ("não sei"). Valor fora da curva (menos da metade ou
+   mais do dobro do esperado) é trocado pelo da tabela, para um erro de digitação não
+   gerar economia absurda. A origem do número vai no e-mail do lead. */
+function estimarEconomiaISS(faturamentoMensal, regime, impostoInformado) {
+  const esperado = impostoEsperado(faturamentoMensal, regime);
+  const fatia = esperado.total > 0 ? esperado.iss / esperado.total : 0;
+  let base = esperado.total;
+  let origem = "calculado pela tabela (imposto não informado)";
+  if (impostoInformado != null) {
+    if (impostoInformado >= esperado.total * 0.5 && impostoInformado <= esperado.total * 2) {
+      base = impostoInformado;
+      origem = "informado pelo escritório";
+    } else {
+      origem = "informado fora da curva (" + formatBRL(impostoInformado) + "), usado o valor da tabela";
+    }
+  }
+  const issMensal = Math.min(base * fatia, faturamentoMensal * ISS_TETO);
+  return { impostoBase: base, impostoEsperado: esperado.total, fatiaIss: fatia, issMensal, issAnual: issMensal * 12, origem };
 }
 
 function formatBRL(value) {
@@ -348,16 +393,6 @@ const WHATSAPP_MENSAGENS = {
     "Olá, equipe Advocont! Vou abrir minha sociedade de advocacia e quero começar do jeito certo: regularizado e no enquadramento tributário ideal desde o primeiro honorário. Podem me orientar nos próximos passos?",
 };
 
-/* Faixas de faturamento mensal da janela do WhatsApp, alinhadas aos limites de PLANS.
-   plano null = sem indicação automática (proposta personalizada ou ainda sem estimativa). */
-const FAIXAS_FATURAMENTO = [
-  { valor: "ate_30", rotulo: "Até R$ 30 mil", texto: "até R$ 30 mil", plano: "essencial" },
-  { valor: "30_60", rotulo: "De R$ 30 mil a R$ 60 mil", texto: "entre R$ 30 mil e R$ 60 mil", plano: "estrategico" },
-  { valor: "60_100", rotulo: "De R$ 60 mil a R$ 100 mil", texto: "entre R$ 60 mil e R$ 100 mil", plano: "prime" },
-  { valor: "acima_100", rotulo: "Acima de R$ 100 mil", texto: "acima de R$ 100 mil", plano: null },
-  { valor: "nao_sei", rotulo: "Ainda não sei", texto: null, plano: null, soAbertura: true },
-];
-
 function linkWhatsApp(texto) {
   return "https://wa.me/" + WHATSAPP_NUMERO + "?text=" + encodeURIComponent(texto);
 }
@@ -367,36 +402,10 @@ function abrirWhatsApp(caminho, texto, origem) {
   window.open(linkWhatsApp(texto || WHATSAPP_MENSAGENS[caminho]), "_blank", "noopener");
 }
 
-/* Mensagem do WhatsApp já com os dados da janela, para o atendente não perguntar de novo. */
-function mensagemWhatsApp(caminho, dados) {
-  const primeiroNome = dados.nome.trim().split(/\s+/)[0];
-  if (caminho === "cnpj") {
-    return (
-      "Olá, equipe Advocont! Sou " + primeiroNome +
-      (dados.cnpj ? ", do escritório de CNPJ " + dados.cnpj : "") +
-      ". Faturamos " + dados.faixa.texto + " por mês e quero descobrir quanto podemos economizar em impostos, dentro da lei. Podem fazer uma análise do meu caso?"
-    );
-  }
-  return (
-    "Olá, equipe Advocont! Sou " + primeiroNome +
-    " e vou abrir minha sociedade de advocacia" +
-    (dados.faixa.texto ? ", com expectativa de faturar " + dados.faixa.texto + " por mês" : "") +
-    ". Quero começar do jeito certo: regularizado e no enquadramento tributário ideal desde o primeiro honorário. Podem me orientar nos próximos passos?"
-  );
-}
-
-function indicacaoPlano(faixa) {
-  if (!faixa) return "";
-  if (faixa.valor === "acima_100") return "Acima de R$ 100 mil por mês montamos uma proposta personalizada.";
-  if (!faixa.plano) return "O especialista ajuda você a estimar e indica o plano certo.";
-  const p = PLANS[faixa.plano];
-  return "Plano indicado para essa faixa: " + p.name + ", " + p.preco + ".";
-}
-
 /* Janela "Falar com especialista", aberta por qualquer elemento com data-whatsapp.
-   Passo 1: já tem CNPJ? Passo 2: nome, WhatsApp, faturamento e, opcionais, CNPJ e e-mail.
-   O lead é enviado no clique, antes de o WhatsApp abrir: quem desiste de mandar a
-   mensagem continua registrado. O link "ir direto" mantém o caminho sem formulário. */
+   Leva ao mesmo fluxo da contratação: quem tem CNPJ cai na estimativa de economia,
+   quem vai abrir cai no planejamento da abertura. O botão de origem segue na URL
+   (?origem=) e vai junto com o lead. O link "ir direto" mantém o WhatsApp sem formulário. */
 function initWhatsAppChooser() {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -405,161 +414,41 @@ function initWhatsAppChooser() {
   overlay.innerHTML =
     '<div class="modal wa-chooser" role="dialog" aria-modal="true" aria-labelledby="wa-chooser-title">' +
       '<button type="button" class="modal-close" aria-label="Fechar">×</button>' +
-      '<div class="wa-step" data-step="1">' +
-        '<p class="eyebrow">Falar com especialista</p>' +
-        '<h3 id="wa-chooser-title">Seu escritório já tem CNPJ?</h3>' +
-        '<p class="lead">Assim o especialista já começa a conversa pelo que importa para você.</p>' +
-        '<div class="choice-group">' +
-          '<button type="button" class="choice-btn" data-wa-caminho="cnpj"><strong>Sim, já tenho CNPJ</strong><span>Quero saber quanto posso economizar em impostos.</span></button>' +
-          '<button type="button" class="choice-btn" data-wa-caminho="abertura"><strong>Ainda não, vou abrir</strong><span>Quero abrir minha sociedade de advocacia regularizada.</span></button>' +
-        '</div>' +
+      '<p class="eyebrow">Falar com especialista</p>' +
+      '<h3 id="wa-chooser-title">Seu escritório já tem CNPJ?</h3>' +
+      '<p class="lead">Assim o especialista já começa a conversa pelo que importa para você.</p>' +
+      '<div class="choice-group">' +
+        '<a class="choice-btn" data-wa-caminho="cnpj" href="formulario.html?caminho=cnpj"><strong>Sim, já tenho CNPJ</strong><span>Descubra em 1 minuto quanto seu escritório pode economizar em impostos.</span></a>' +
+        '<a class="choice-btn" data-wa-caminho="abertura" href="formulario.html?caminho=abertura"><strong>Ainda não, vou abrir</strong><span>Receba o plano ideal para abrir sua sociedade de advocacia.</span></a>' +
       '</div>' +
-      '<form class="wa-step" data-step="2" hidden novalidate>' +
-        '<p class="eyebrow">Falar com especialista</p>' +
-        '<h3 class="wa-form-title">Conte rapidinho sobre o escritório</h3>' +
-        '<p class="lead">Leva 20 segundos e o especialista já chega com a análise certa.</p>' +
-        '<input type="checkbox" name="botcheck" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true" />' +
-        '<div class="field">' +
-          '<label for="wa-nome">Nome e sobrenome</label>' +
-          '<input type="text" id="wa-nome" name="nome" required data-validate="nome" autocomplete="name" />' +
-          '<span class="field-error">Informe nome e sobrenome.</span>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="wa-telefone">WhatsApp (com DDD)</label>' +
-          '<input type="tel" id="wa-telefone" name="telefone" required data-validate="telefone" autocomplete="tel" />' +
-          '<span class="field-error">Informe um WhatsApp válido com DDD.</span>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="wa-faturamento" class="wa-faturamento-label">Faturamento médio por mês</label>' +
-          '<select id="wa-faturamento" name="faturamento" required></select>' +
-          '<span class="field-error">Escolha uma faixa de faturamento.</span>' +
-          '<span class="wa-plano-indicado" aria-live="polite"></span>' +
-        '</div>' +
-        '<div class="field wa-campo-cnpj">' +
-          '<label for="wa-cnpj">CNPJ <span class="opcional">(opcional)</span></label>' +
-          '<input type="text" id="wa-cnpj" name="cnpj" data-validate="cnpj" />' +
-          '<span class="field-error">CNPJ inválido. Confira os números ou deixe em branco.</span>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="wa-email">E-mail <span class="opcional">(opcional)</span></label>' +
-          '<input type="email" id="wa-email" name="email" data-validate="email" autocomplete="email" />' +
-          '<span class="field-error">E-mail inválido. Confira ou deixe em branco.</span>' +
-        '</div>' +
-        '<button type="submit" class="btn btn-gold btn-block" style="margin-top:22px;">Continuar no WhatsApp</button>' +
-        '<p class="pricing-note" style="margin-top:10px;">Ao continuar, você concorda com a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</p>' +
-        '<div class="wa-form-links">' +
-          '<button type="button" class="wa-link" data-wa-voltar>Voltar</button>' +
-          '<button type="button" class="wa-link" data-wa-direto>Prefiro ir direto ao WhatsApp</button>' +
-        '</div>' +
-      '</form>' +
+      '<div class="wa-form-links"><span></span><button type="button" class="wa-link" data-wa-direto>Prefiro ir direto ao WhatsApp</button></div>' +
     '</div>';
   document.body.appendChild(overlay);
 
-  const passo1 = overlay.querySelector('[data-step="1"]');
-  const form = overlay.querySelector('[data-step="2"]');
-  const select = form.querySelector("#wa-faturamento");
-  const indicado = form.querySelector(".wa-plano-indicado");
-  const campoCnpj = form.querySelector(".wa-campo-cnpj");
-  attachPhoneMask(form.querySelector("#wa-telefone"));
-  attachCNPJMask(form.querySelector("#wa-cnpj"));
-
   let origem = "site";
-  let caminho = "cnpj";
-
   const fechar = () => { overlay.hidden = true; };
-  function mostrarPasso(n) {
-    passo1.hidden = n !== 1;
-    form.hidden = n !== 2;
-    (n === 1 ? passo1.querySelector("[data-wa-caminho]") : form.querySelector("#wa-nome")).focus();
-  }
-  function prepararFormulario() {
-    const abertura = caminho === "abertura";
-    form.querySelector(".wa-form-title").textContent = abertura ? "Conte rapidinho sobre o seu plano" : "Conte rapidinho sobre o escritório";
-    form.querySelector(".wa-faturamento-label").textContent = abertura ? "Quanto espera faturar por mês" : "Faturamento médio por mês";
-    campoCnpj.hidden = abertura;
-    const atual = select.value;
-    select.innerHTML =
-      '<option value="">Escolha a faixa</option>' +
-      FAIXAS_FATURAMENTO.filter((f) => abertura || !f.soAbertura)
-        .map((f) => '<option value="' + f.valor + '">' + f.rotulo + "</option>").join("");
-    select.value = select.querySelector('option[value="' + atual + '"]') ? atual : "";
-    indicado.textContent = indicacaoPlano(FAIXAS_FATURAMENTO.find((f) => f.valor === select.value));
-  }
-
-  select.addEventListener("change", () => {
-    select.closest(".field").classList.remove("invalid");
-    indicado.textContent = indicacaoPlano(FAIXAS_FATURAMENTO.find((f) => f.valor === select.value));
-  });
-  form.querySelectorAll("input").forEach((input) =>
-    input.addEventListener("input", () => input.closest(".field")?.classList.remove("invalid"))
-  );
-
   overlay.querySelector(".modal-close").addEventListener("click", fechar);
   overlay.addEventListener("click", (e) => { if (e.target === overlay) fechar(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !overlay.hidden) fechar(); });
-  overlay.querySelectorAll("[data-wa-caminho]").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      caminho = btn.dataset.waCaminho;
-      prepararFormulario();
-      mostrarPasso(2);
-    })
+  overlay.querySelectorAll("[data-wa-caminho]").forEach((link) =>
+    link.addEventListener("click", () => track("especialista_formulario", { caminho: link.dataset.waCaminho, origem: origem }))
   );
-  form.querySelector("[data-wa-voltar]").addEventListener("click", () => mostrarPasso(1));
-  form.querySelector("[data-wa-direto]").addEventListener("click", () => {
+  overlay.querySelector("[data-wa-direto]").addEventListener("click", () => {
     fechar();
-    abrirWhatsApp(caminho, null, origem + "_direto");
-  });
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    let ok = true;
-    form.querySelectorAll(".field").forEach((field) => {
-      if (field.hidden) return;
-      const input = field.querySelector("input, select");
-      // Opcionais em branco passam; preenchidos precisam ser válidos
-      const valido = !input.required && !input.value.trim() ? true : isFieldValid(input);
-      field.classList.toggle("invalid", !valido);
-      if (!valido && ok) { ok = false; input.focus(); }
-    });
-    if (!ok) return;
-
-    const faixa = FAIXAS_FATURAMENTO.find((f) => f.valor === select.value);
-    const dados = {
-      nome: form.nome.value.trim(),
-      telefone: form.telefone.value,
-      email: form.email.value.trim(),
-      cnpj: caminho === "cnpj" ? form.cnpj.value : "",
-      faixa: faixa,
-    };
-    const plano = faixa.plano ? PLANS[faixa.plano].name : faixa.valor === "acima_100" ? "Proposta personalizada" : "A definir na conversa";
-
-    // Sem await: o WhatsApp precisa abrir ainda dentro do clique, senão o navegador bloqueia
-    submitLead(
-      {
-        nome: dados.nome,
-        telefone: dados.telefone,
-        email: dados.email || "não informado",
-        caminho: caminho === "cnpj" ? "Já tem CNPJ" : "Vai abrir a sociedade",
-        cnpj: dados.cnpj || (caminho === "cnpj" ? "não informado" : "ainda não tem"),
-        faturamento_mensal: faixa.rotulo,
-        plano_indicado: plano,
-        origem: "Botão WhatsApp (" + origem + ") — advocont.com",
-      },
-      "WhatsApp - " + dados.nome + " - " + faixa.rotulo
-    ).catch(() => {});
-
-    fechar();
-    abrirWhatsApp(caminho, mensagemWhatsApp(caminho, dados), origem);
+    abrirWhatsApp("cnpj", "Olá, equipe Advocont! Quero falar com um especialista sobre a contabilidade do meu escritório.", origem + "_direto");
   });
 
   document.querySelectorAll("[data-whatsapp]").forEach((el) =>
     el.addEventListener("click", (e) => {
       e.preventDefault();
       origem = el.dataset.whatsapp || "site";
+      overlay.querySelectorAll("[data-wa-caminho]").forEach((link) => {
+        link.href = "formulario.html?caminho=" + link.dataset.waCaminho + "&origem=" + encodeURIComponent(origem);
+      });
       const menu = document.getElementById("menu-toggle");
       if (menu) menu.checked = false;
       overlay.hidden = false;
-      mostrarPasso(1);
+      overlay.querySelector("[data-wa-caminho]").focus();
     })
   );
 }

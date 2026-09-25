@@ -1,5 +1,7 @@
 /* Lógica do formulário de contratação (antes inline em formulario.html). */
   const planoInteresse = getQueryParam("plano");
+  // Botão do site que trouxe o lead (vem da janela "Falar com especialista")
+  const origemLead = "Formulário" + (getQueryParam("origem") ? " (botão " + getQueryParam("origem") + ")" : "") + " — advocont.com";
   const state = {};
   const STEP_ORDER = { contato: 1, cnpj: 2, "dados-a": 3, "resultado-a": 4, "dados-b": 3, "resultado-b": 4, confirmacao: 5 };
   const TOTAL_STEPS = 5;
@@ -27,22 +29,14 @@
     btn.onclick = () => track("whatsapp_click", { caminho: caminho, origem: "formulario_final" });
   }
 
-  function mensagemCNPJ(nome, regime, faturamentoTxt, plano) {
-    const nomes = { simples: "Simples Nacional", presumido: "Lucro Presumido" };
-    const melhor = state.simplesAnual <= state.presumidoAnual ? "simples" : "presumido";
-    const diferenca = Math.abs(state.presumidoAnual - state.simplesAnual);
-    const atual = regime === "Simples Nacional" ? "simples" : regime === "Lucro Presumido" ? "presumido" : null;
-    let economia;
-    if (atual && atual !== melhor) {
-      economia = "A simulação apontou uma economia estimada de " + formatBRL(diferenca) + " por ano migrando para o " + nomes[melhor] + ". ";
-    } else if (atual) {
-      economia = "A simulação indicou que já estou no regime mais vantajoso, e quero saber onde mais dá para economizar. ";
-    } else {
-      economia = "A simulação indicou o " + nomes[melhor] + " como o mais vantajoso, com diferença estimada de " + formatBRL(diferenca) + " por ano. ";
-    }
-    return "Olá, equipe Advocont! Sou " + nome + " e acabei de fazer a simulação no site. Meu escritório já tem CNPJ, está " +
-      (atual ? "no " + regime : "com regime a confirmar") + " e fatura cerca de " + faturamentoTxt + " por mês. " + economia +
-      "Quero seguir com o " + plano + ". Podemos conversar?";
+  /* Mensagens do resultado "já tenho CNPJ": pedir horário para a análise ou só conversar. */
+  function mensagemCNPJ(nome, economiaAnual, agendar) {
+    const primeiroNome = nome.trim().split(/\s+/)[0];
+    return "Olá, equipe Advocont! Sou " + primeiroNome + " e fiz a estimativa no site: meu escritório pode economizar até " +
+      formatBRL(economiaAnual) + " por ano em impostos. " +
+      (agendar
+        ? "Quero agendar a análise para confirmar esse valor. Quais horários vocês têm disponíveis?"
+        : "Quero entender como chegar nesse resultado. Podemos conversar?");
   }
 
   function mensagemAbertura(nome, cidade, uf, plano) {
@@ -57,13 +51,33 @@
   attachPhoneMask(document.getElementById("telefone"));
   attachCNPJMask(document.getElementById("a-cnpj"));
   attachCurrencyMask(document.getElementById("a-faturamento"));
+  attachCurrencyMask(document.getElementById("a-imposto"));
+
+  const impostoInput = document.getElementById("a-imposto");
+  document.getElementById("a-imposto-nao-sei").addEventListener("change", (e) => {
+    const naoSei = e.target.checked;
+    impostoInput.required = !naoSei;
+    impostoInput.disabled = naoSei;
+    if (naoSei) { impostoInput.value = ""; impostoInput.dataset.rawValue = "0"; }
+    const field = impostoInput.closest(".field");
+    field.classList.toggle("desativado", naoSei);
+    field.classList.remove("invalid");
+  });
   attachCurrencyMask(document.getElementById("b-faturamento"));
 
+  let caminhoAtual = caminhoDireto === "dados-a" ? "a" : caminhoDireto === "dados-b" ? "b" : null;
   function goTo(stepName) {
     document.querySelectorAll(".wizard-step").forEach((el) => el.classList.remove("active"));
     document.querySelector('.wizard-step[data-step="' + stepName + '"]').classList.add("active");
-    document.getElementById("wizard-progress").textContent = "Etapa " + STEP_ORDER[stepName] + " de " + TOTAL_STEPS;
+    // O caminho "já tenho CNPJ" termina no resultado: são 3 etapas até a estimativa
+    if (stepName === "dados-a") caminhoAtual = "a";
+    else if (stepName === "dados-b") caminhoAtual = "b";
+    const total = caminhoAtual === "a" ? 3 : TOTAL_STEPS;
+    document.getElementById("wizard-progress").textContent =
+      stepName === "resultado-a" ? "Sua estimativa" : "Etapa " + STEP_ORDER[stepName] + " de " + total;
   }
+
+  if (caminhoAtual === "a") document.getElementById("wizard-progress").textContent = "Etapa 1 de 3";
 
   function validateStep(stepEl) {
     let valid = true;
@@ -110,36 +124,73 @@
 
   function renderResultadoA() {
     const faturamento = parseFloat(document.getElementById("a-faturamento").dataset.rawValue || "0");
-    const simples = calcSimplesAnexoIV(faturamento);
-    const presumido = calcLucroPresumido(faturamento);
+    const regime = document.getElementById("a-regime").value;
+    const naoSei = document.getElementById("a-imposto-nao-sei").checked;
+    const impostoInformado = naoSei ? null : parseFloat(impostoInput.dataset.rawValue || "0");
+    const est = estimarEconomiaISS(faturamento, regime, impostoInformado);
+    const acimaDosPlanos = faturamento > LIMITE_PLANOS;
     const planoKey = recommendPlan(faturamento);
     const plano = PLANS[planoKey];
-    const melhor = simples.anual <= presumido.anual ? "simples" : "presumido";
+    const vezes = est.issAnual / (plano.valor * 12);
 
     document.getElementById("resultado-a-content").innerHTML =
-      '<div class="compare-result">' +
-        '<div class="regime-card ' + (melhor === "simples" ? "better" : "") + '">' +
-          '<p class="regime-name">Simples Nacional (Anexo IV)</p>' +
-          '<p class="regime-value">' + formatBRL(simples.mensal) + '<span class="regime-unit">/mês</span></p>' +
-          '<p class="regime-annual">' + formatBRL(simples.anual) + '/ano</p>' +
-        '</div>' +
-        '<div class="regime-card ' + (melhor === "presumido" ? "better" : "") + '">' +
-          '<p class="regime-name">Lucro Presumido</p>' +
-          '<p class="regime-value">' + formatBRL(presumido.mensal) + '<span class="regime-unit">/mês</span></p>' +
-          '<p class="regime-annual">' + formatBRL(presumido.anual) + '/ano</p>' +
-        '</div>' +
+      '<div class="economia-card">' +
+        '<p class="economia-rotulo">Seu escritório pode economizar até</p>' +
+        '<p class="economia-valor">' + formatBRL(est.issAnual) + ' por ano</p>' +
+        '<p class="economia-mensal">cerca de ' + formatBRL(est.issMensal) + ' por mês em impostos</p>' +
       '</div>' +
-      '<p class="pricing-note">Valores estimados com base em tabelas padrão. A Advocont confirma o enquadramento exato na consultoria. No Simples Nacional, o INSS patronal (CPP) é recolhido à parte.</p>' +
       '<div class="recommend-card">' +
-        '<p class="eyebrow">Plano recomendado</p>' +
-        '<p class="plan-name">' + plano.name + " · " + plano.preco + '</p>' +
-        '<ul>' + plano.deliverables.map((d) => '<li><span class="tick">✓</span> ' + d + '</li>').join("") + '</ul>' +
-      '</div>' + avisoPlano(faturamento, planoKey);
+        '<p class="eyebrow">Plano indicado</p>' +
+        (acimaDosPlanos
+          ? '<p class="plan-name">Proposta personalizada</p><p class="pricing-note">Acima de R$ 100 mil por mês, o especialista monta a proposta na análise.</p>'
+          : '<p class="plan-name">' + plano.name + " · " + plano.preco + '</p>' +
+            (vezes >= 1 ? '<p class="pricing-note">A economia estimada paga o plano <strong>' + vezes.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + ' vezes</strong>.</p>' : '')) +
+      '</div>' +
+      '<p class="economia-aviso">Estimativa baseada no faturamento e nos impostos informados pelo seu escritório. ' +
+        (naoSei ? 'Como o imposto não foi informado, usamos o valor esperado para o seu faturamento. ' : '') +
+        'O valor exato é confirmado na reunião de análise, sem compromisso.</p>';
 
-    state.simplesAnual = simples.anual;
-    state.presumidoAnual = presumido.anual;
-    state.planoRecomendado = plano.name;
+    const nome = document.getElementById("nome").value;
+    document.getElementById("a-agendar").href = linkWhatsApp(mensagemCNPJ(nome, est.issAnual, true));
+    document.getElementById("a-whatsapp").href = linkWhatsApp(mensagemCNPJ(nome, est.issAnual, false));
+
+    enviarLeadA({
+      nome,
+      telefone: document.getElementById("telefone").value,
+      email: document.getElementById("email").value,
+      plano_de_interesse: (planoInteresse && PLANS[planoInteresse]) ? PLANS[planoInteresse].name : "(não informado)",
+      origem: origemLead,
+      caminho: "Já possui CNPJ — estimativa de economia",
+      cnpj: document.getElementById("a-cnpj").value,
+      regime_atual: regime,
+      faturamento_medio_mensal: formatBRL(faturamento),
+      imposto_informado: naoSei ? "não sabe" : formatBRL(impostoInformado),
+      imposto_usado_no_calculo: formatBRL(est.impostoBase) + " (" + est.origem + ")",
+      imposto_esperado_pela_tabela: formatBRL(est.impostoEsperado),
+      parcela_de_iss_no_imposto: (est.fatiaIss * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%",
+      economia_estimada_mensal: formatBRL(est.issMensal),
+      economia_estimada_anual: formatBRL(est.issAnual),
+      plano_recomendado: acimaDosPlanos ? "Proposta personalizada" : plano.name,
+    });
   }
+
+  /* O lead sai quando o resultado aparece: o contato já foi pedido na 1ª etapa.
+     Refazer a estimativa com os mesmos dados não duplica o envio. */
+  let ultimoEnvioA = "";
+  function enviarLeadA(payload) {
+    const chave = JSON.stringify(payload);
+    if (chave === ultimoEnvioA) return;
+    ultimoEnvioA = chave;
+    submitLead(payload, "Estimativa de economia - " + payload.nome + " - " + payload.economia_estimada_anual + "/ano").catch(() => {
+      ultimoEnvioA = "";
+    });
+  }
+
+  ["a-agendar", "a-whatsapp"].forEach((id) =>
+    document.getElementById(id).addEventListener("click", () =>
+      track("whatsapp_click", { caminho: "cnpj", origem: id === "a-agendar" ? "resultado_agendar" : "resultado_whatsapp" })
+    )
+  );
 
   function renderResultadoB() {
     const faturamento = parseFloat(document.getElementById("b-faturamento").dataset.rawValue || "0");
@@ -162,43 +213,8 @@
     state.planoRecomendado = plano.name;
   }
 
-  document.getElementById("concorda-a").addEventListener("change", (e) => {
-    document.getElementById("btn-enviar-a").disabled = !e.target.checked;
-  });
   document.getElementById("concorda-b").addEventListener("change", (e) => {
     document.getElementById("btn-enviar-b").disabled = !e.target.checked;
-  });
-
-  document.getElementById("form-a").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById("btn-enviar-a");
-    const status = e.target.querySelector(".form-status");
-    const nome = document.getElementById("nome").value;
-    const payload = {
-      nome,
-      telefone: document.getElementById("telefone").value,
-      email: document.getElementById("email").value,
-      plano_de_interesse: (planoInteresse && PLANS[planoInteresse]) ? PLANS[planoInteresse].name : "(não informado)",
-      caminho: "Já possui CNPJ — transferência de contabilidade",
-      cnpj: document.getElementById("a-cnpj").value,
-      regime_atual: document.getElementById("a-regime").value,
-      faturamento_ultimo_mes: document.getElementById("a-faturamento").value,
-      simulacao_simples_nacional_anual: formatBRL(state.simplesAnual || 0),
-      simulacao_lucro_presumido_anual: formatBRL(state.presumidoAnual || 0),
-      plano_recomendado: state.planoRecomendado || "",
-    };
-    btn.disabled = true;
-    status.textContent = "Enviando...";
-    status.className = "form-status visible is-sending";
-    try {
-      await submitLead(payload, "Transferência de contabilidade - " + nome);
-      prepararWhatsAppFinal("cnpj", mensagemCNPJ(nome, payload.regime_atual, payload.faturamento_ultimo_mes, payload.plano_recomendado));
-      goTo("confirmacao");
-    } catch (err) {
-      status.textContent = "Não foi possível enviar agora. Tente novamente ou chame no WhatsApp.";
-      status.className = "form-status visible is-error";
-      btn.disabled = false;
-    }
   });
 
   document.getElementById("form-b").addEventListener("submit", async (e) => {
@@ -211,6 +227,7 @@
       telefone: document.getElementById("telefone").value,
       email: document.getElementById("email").value,
       plano_de_interesse: (planoInteresse && PLANS[planoInteresse]) ? PLANS[planoInteresse].name : "(não informado)",
+      origem: origemLead,
       caminho: "Ainda não possui CNPJ — abertura de novo CNPJ",
       cidade: document.getElementById("b-cidade").value,
       uf: document.getElementById("b-uf").value,
